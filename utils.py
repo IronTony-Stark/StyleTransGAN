@@ -23,6 +23,11 @@ def log_weights(writer: torch.utils.tensorboard.SummaryWriter, model: torch.nn.M
             writer.add_histogram(f"Generator/{name}.grad", weight.grad, iteration)
 
 
+def requires_grad(model, flag=True):
+    for p in model.parameters():
+        p.requires_grad = flag
+
+
 def pretty_json(json_dict: typing.Dict):
     json_hp = json.dumps(json_dict, indent=2)
     return "".join("\t" + line for line in json_hp.splitlines(True))
