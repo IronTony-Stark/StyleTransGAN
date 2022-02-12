@@ -66,7 +66,7 @@ class Dataset(torch.utils.data.Dataset):
         # Transformation
         self.transform = torchvision.transforms.Compose([
             # Resize the image
-            torchvision.transforms.Resize(image_size),
+            torchvision.transforms.Resize((image_size, image_size)),
             # Convert to PyTorch tensor
             torchvision.transforms.ToTensor(),
         ])
@@ -172,7 +172,7 @@ class Configs(BaseConfigs):
     # You can find the download instruction in this
     # [discussion on fast.ai](https://forums.fast.ai/t/download-celeba-hq-dataset/45873/3).
     # Save the images inside `data/stylegan` folder.
-    dataset_path: str = '../input/celeba-dataset'
+    dataset_path: str = '../input/celeba-dataset/img_align_celeba/img_align_celeba/'
 
     def init(self):
         """
@@ -181,7 +181,7 @@ class Configs(BaseConfigs):
         # Create dataset
         dataset = Dataset(self.dataset_path, self.image_size)
         # Create data loader
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, num_workers=8,
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, num_workers=2,
                                                  shuffle=True, drop_last=True, pin_memory=True)
         # Continuous [cyclic loader](../../utils.html#cycle_dataloader)
         self.loader = cycle_dataloader(dataloader)
@@ -445,7 +445,6 @@ def main():
 
     # Set configurations and override some
     experiment.configs(configs, {
-        'device.cuda_device': 0,
         'image_size': 64,
         'log_generated_interval': 200
     })
