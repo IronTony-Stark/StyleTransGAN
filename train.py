@@ -210,7 +210,7 @@ class Trainer:
         # self.writer.add_scalar("Generator/Score", fake_output.mean().item(), idx)
 
         # Logging
-        if (idx + 1) % self.args.log_losses_interval == 0:
+        if idx % self.args.log_losses_interval == 0:
             print(
                 f"[Step {idx}/{self.args.training_steps}] "
                 f"[D loss: {round(dis_loss.item(), 4) if dis_loss else '?'}] "
@@ -239,6 +239,8 @@ class Trainer:
 
 
 def main():
+    torch.manual_seed(0)  # for reproducibility
+
     parser = argparse.ArgumentParser()
 
     # Parameters
