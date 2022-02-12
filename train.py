@@ -172,7 +172,7 @@ class Configs(BaseConfigs):
     # You can find the download instruction in this
     # [discussion on fast.ai](https://forums.fast.ai/t/download-celeba-hq-dataset/45873/3).
     # Save the images inside `data/stylegan` folder.
-    dataset_path: str = '../../img_align_celeba'
+    dataset_path: str = '../input/celeba-dataset'
 
     def init(self):
         """

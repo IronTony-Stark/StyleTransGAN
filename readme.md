@@ -1,3 +1,5 @@
+Kindly stolen from https://github.com/labmlai/annotated_deep_learning_paper_implementations
+
 # [StyleGAN 2](https://nn.labml.ai/gan/stylegan/index.html)
 
 This is a [PyTorch](https://pytorch.org) implementation of the paper
