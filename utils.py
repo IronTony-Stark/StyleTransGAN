@@ -28,36 +28,6 @@ def pretty_json(json_dict: typing.Dict):
     return "".join("\t" + line for line in json_hp.splitlines(True))
 
 
-def manual_seed_all(seed: int = None):
-    import numpy
-    import random
-
-    if not seed:
-        seed = 0
-
-    print("[ Using Seed : ", seed, " ]")
-
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":16:8"
-    numpy.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms(True)
-
-
-def manual_seed_worker(worker_id: int):
-    import numpy
-    import random
-
-    worker_seed = torch.initial_seed() % 2 ** 32
-    numpy.random.seed(worker_seed)
-    random.seed(worker_seed)
-
-
 class ImageDataset(torch.utils.data.Dataset):
     def __init__(self, path: str, image_size: int):
         super().__init__()
@@ -119,3 +89,36 @@ class Checkpoint:
             self.optimizer_gen.load_state_dict(state_dict["optimizer_generator_state_dict"])
             self.optimizer_map.load_state_dict(state_dict["optimizer_mapping_network_state_dict"])
         return state_dict["score"], state_dict["step"]
+
+
+def manual_seed_all(seed: int = None):
+    import numpy
+    import random
+
+    if not seed:
+        seed = 0
+
+    print("[ Using Seed : ", seed, " ]")
+
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":16:8"
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    torch.use_deterministic_algorithms(True)
+    # noinspection PyUnresolvedReferences
+    torch.backends.cudnn.benchmark = False
+    # noinspection PyUnresolvedReferences
+    torch.backends.cudnn.deterministic = True
+
+
+# noinspection PyUnusedLocal
+def manual_seed_worker(worker_id: int):
+    import numpy
+    import random
+
+    worker_seed = torch.initial_seed() % 2 ** 32
+    numpy.random.seed(worker_seed)
+    random.seed(worker_seed)

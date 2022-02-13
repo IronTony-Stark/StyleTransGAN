@@ -10,14 +10,17 @@ from torch.utils.tensorboard import SummaryWriter
 from loss import discriminator_loss, generator_loss, gradient_penalty, PathLengthPenalty
 from model import Discriminator, Generator, MappingNetwork
 from utils import cycle_dataloader, log_weights, pretty_json, \
-    manual_seed_all, manual_seed_worker, \
     ImageDataset, Checkpoint
 
 
 # Reproducibility
-manual_seed_all()
-g = torch.Generator()
-g.manual_seed(0)
+# Note 1: Currently upsample_bilinear2d_backward_out_cuda does not have a deterministic implementation
+# so result on GPU machines will be different every time
+# Note 2: Don't forget to uncomment one line during DataLoader initialization
+# from utils import manual_seed_all, manual_seed_worker
+# manual_seed_all()
+# g = torch.Generator()
+# g.manual_seed(0)
 
 
 class Trainer:
@@ -83,7 +86,7 @@ class Trainer:
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self.args.batch_size, num_workers=2,
             shuffle=True, drop_last=True, pin_memory=True,
-            worker_init_fn=manual_seed_worker, generator=g
+            # worker_init_fn=manual_seed_worker, generator=g
         )
         self.loader = cycle_dataloader(dataloader)
 
