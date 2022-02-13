@@ -225,7 +225,6 @@ class Conv2dWeightModulate(nn.Module):
             weights = weights * sigma_inv
 
         x = x.reshape(1, -1, h, w)
-
         _, _, *ws = weights.shape
         weights = weights.reshape(b * self.out_features, *ws)
 
@@ -287,7 +286,7 @@ class Discriminator(nn.Module):
 
         x = self.conv(x)
 
-        x = x.reshape(x.shape[0], -1)
+        x = x.reshape(x.shape[0], -1)  # flatten
         return self.final(x)
 
 

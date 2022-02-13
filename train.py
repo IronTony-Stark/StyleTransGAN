@@ -172,7 +172,7 @@ class Trainer:
         # For stabilization
         torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=1.0)
 
-        self.discriminator_optimizer.step()
+        # self.discriminator_optimizer.step()
 
         self.writer.add_scalar("Discriminator/Loss", dis_loss.item(), idx)
         self.writer.add_scalar("Discriminator/Real Score", real_output.mean().item(), idx)
