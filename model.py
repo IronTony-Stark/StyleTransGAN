@@ -1,11 +1,13 @@
 import math
 from typing import Tuple, Optional, List
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.utils.data
 from torch import nn
+
+from equalized_lr import EqualizedLinear, EqualizedConv2d, EqualizedWeight
+from up_down_sample import UpSample, DownSample
 
 
 class MappingNetwork(nn.Module):
@@ -503,188 +505,6 @@ class MiniBatchStdDev(nn.Module):
         std = std.expand(b, -1, h, w)
         # Append (concatenate) the standard deviations to the feature map
         return torch.cat([x, std], dim=1)
-
-
-class DownSample(nn.Module):
-    """
-    <a id="down_sample"></a>
-
-    ### Down-sample
-
-    The down-sample operation [smoothens](#smooth) each feature channel and
-     scale $2 \times$ using bilinear interpolation.
-    This is based on the paper
-     [Making Convolutional Networks Shift-Invariant Again](https://papers.labml.ai/paper/1904.11486).
-    """
-
-    def __init__(self):
-        super().__init__()
-        # Smoothing layer
-        self.smooth = Smooth()
-
-    def forward(self, x: torch.Tensor):
-        # Smoothing or blurring
-        x = self.smooth(x)
-        # Scaled down
-        return F.interpolate(x, (x.shape[2] // 2, x.shape[3] // 2), mode='bilinear', align_corners=False)
-
-
-class UpSample(nn.Module):
-    """
-    <a id="up_sample"></a>
-
-    ### Up-sample
-
-    The up-sample operation scales the image up by $2 \times$ and [smoothens](#smooth) each feature channel.
-    This is based on the paper
-     [Making Convolutional Networks Shift-Invariant Again](https://papers.labml.ai/paper/1904.11486).
-    """
-
-    def __init__(self):
-        super().__init__()
-        # Up-sampling layer
-        self.up_sample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
-        # Smoothing layer
-        self.smooth = Smooth()
-
-    def forward(self, x: torch.Tensor):
-        # Up-sample and smoothen
-        return self.smooth(self.up_sample(x))
-
-
-class Smooth(nn.Module):
-    """
-    <a id="smooth"></a>
-
-    ### Smoothing Layer
-
-    This layer blurs each channel
-    """
-
-    def __init__(self):
-        super().__init__()
-        # Blurring kernel
-        kernel = [[1, 2, 1],
-                  [2, 4, 2],
-                  [1, 2, 1]]
-        # Convert the kernel to a PyTorch tensor
-        kernel = torch.tensor([[kernel]], dtype=torch.float)
-        # Normalize the kernel
-        kernel /= kernel.sum()
-        # Save kernel as a fixed parameter (no gradient updates)
-        self.kernel = nn.Parameter(kernel, requires_grad=False)
-        # Padding layer
-        self.pad = nn.ReplicationPad2d(1)
-
-    def forward(self, x: torch.Tensor):
-        # Get shape of the input feature map
-        b, c, h, w = x.shape
-        # Reshape for smoothening
-        x = x.view(-1, 1, h, w)
-
-        # Add padding
-        x = self.pad(x)
-
-        # Smoothen (blur) with the kernel
-        x = F.conv2d(x, self.kernel)
-
-        # Reshape and return
-        return x.view(b, c, h, w)
-
-
-class EqualizedLinear(nn.Module):
-    """
-    <a id="equalized_linear"></a>
-
-    ## Learning-rate Equalized Linear Layer
-
-    This uses [learning-rate equalized weights](#equalized_weights) for a linear layer.
-    """
-
-    def __init__(self, in_features: int, out_features: int, bias: float = 0.):
-        """
-        * `in_features` is the number of features in the input feature map
-        * `out_features` is the number of features in the output feature map
-        * `bias` is the bias initialization constant
-        """
-
-        super().__init__()
-        # [Learning-rate equalized weights](#equalized_weights)
-        self.weight = EqualizedWeight([out_features, in_features])
-        # Bias
-        self.bias = nn.Parameter(torch.ones(out_features) * bias)
-
-    def forward(self, x: torch.Tensor):
-        # Linear transformation
-        return F.linear(x, self.weight(), bias=self.bias)
-
-
-class EqualizedConv2d(nn.Module):
-    """
-    <a id="equalized_conv2d"></a>
-
-    ## Learning-rate Equalized 2D Convolution Layer
-
-    This uses [learning-rate equalized weights](#equalized_weights) for a convolution layer.
-    """
-
-    def __init__(self, in_features: int, out_features: int,
-                 kernel_size: int, padding: int = 0):
-        """
-        * `in_features` is the number of features in the input feature map
-        * `out_features` is the number of features in the output feature map
-        * `kernel_size` is the size of the convolution kernel
-        * `padding` is the padding to be added on both sides of each size dimension
-        """
-        super().__init__()
-        # Padding size
-        self.padding = padding
-        # [Learning-rate equalized weights](#equalized_weights)
-        self.weight = EqualizedWeight([out_features, in_features, kernel_size, kernel_size])
-        # Bias
-        self.bias = nn.Parameter(torch.ones(out_features))
-
-    def forward(self, x: torch.Tensor):
-        # Convolution
-        return F.conv2d(x, self.weight(), bias=self.bias, padding=self.padding)
-
-
-class EqualizedWeight(nn.Module):
-    """
-    <a id="equalized_weight"></a>
-
-    ## Learning-rate Equalized Weights Parameter
-
-    This is based on equalized learning rate introduced in the Progressive GAN paper.
-    Instead of initializing weights at $\mathcal{N}(0,c)$ they initialize weights
-    to $\mathcal{N}(0, 1)$ and then multiply them by $c$ when using it.
-    $$w_i = c \hat{w}_i$$
-
-    The gradients on stored parameters $\hat{w}$ get multiplied by $c$ but this doesn't have
-    an affect since optimizers such as Adam normalize them by a running mean of the squared gradients.
-
-    The optimizer updates on $\hat{w}$ are proportionate to the learning rate $\lambda$.
-    But the effective weights $w$ get updated proportionately to $c \lambda$.
-    Without equalized learning rate, the effective weights will get updated proportionately to just $\lambda$.
-
-    So we are effectively scaling the learning rate by $c$ for these weight parameters.
-    """
-
-    def __init__(self, shape: List[int]):
-        """
-        * `shape` is the shape of the weight parameter
-        """
-        super().__init__()
-
-        # He initialization constant
-        self.c = 1 / math.sqrt(np.prod(shape[1:]))
-        # Initialize the weights with $\mathcal{N}(0, 1)$
-        self.weight = nn.Parameter(torch.randn(shape))
-        # Weight multiplication coefficient
-
-    def forward(self):
-        # Multiply the weights by $c$ and return
-        return self.weight * self.c
 
 
 class GradientPenalty(nn.Module):
