@@ -7,7 +7,7 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 
-from loss import DiscriminatorLoss, GeneratorLoss, GradientPenalty, PathLengthPenalty
+from loss import discriminator_loss, generator_loss, gradient_penalty, PathLengthPenalty
 from model import Discriminator, Generator, MappingNetwork
 from utils import cycle_dataloader, log_weights, pretty_json, ImageDataset, Checkpoint
 
@@ -24,15 +24,11 @@ class Trainer:
     generator: Generator
     mapping_network: MappingNetwork
 
-    # Losses
-    discriminator_loss: DiscriminatorLoss
-    generator_loss: GeneratorLoss
-
     # Penalties
-    gradient_penalty = GradientPenalty()
     gradient_penalty_coefficient: float = 10.
 
     path_length_penalty: PathLengthPenalty
+    path_length_beta = 0.99
 
     # Optimizers
     generator_optimizer: torch.optim.Adam
@@ -58,9 +54,7 @@ class Trainer:
         self.generator = Generator(log_resolution, self.args.d_latent).to(self.device)
         self.mapping_network = MappingNetwork(self.args.d_latent, self.args.mapping_network_layers).to(self.device)
 
-        self.discriminator_loss = DiscriminatorLoss().to(self.device)
-        self.generator_loss = GeneratorLoss().to(self.device)
-        self.path_length_penalty = PathLengthPenalty(0.99).to(self.device)
+        self.path_length_penalty = PathLengthPenalty(self.path_length_beta).to(self.device)
 
         self.discriminator_optimizer = torch.optim.Adam(
             self.discriminator.parameters(),
@@ -155,12 +149,12 @@ class Trainer:
 
         real_output = self.discriminator(real_images)
 
-        real_loss, fake_loss = self.discriminator_loss(real_output, fake_output)
+        real_loss, fake_loss = discriminator_loss(real_output, fake_output)
 
         dis_loss = real_loss + fake_loss
 
         if (idx + 1) % self.args.lazy_gradient_penalty_interval == 0:
-            gp = self.gradient_penalty(real_images, real_output)
+            gp = gradient_penalty(real_images, real_output)
 
             # TODO move below
             self.writer.add_scalar("Discriminator/Gradient Penalty", gp.item(), idx)
@@ -192,7 +186,7 @@ class Trainer:
 
         fake_output = self.discriminator(generated_images)
 
-        gen_loss = self.generator_loss(fake_output)
+        gen_loss = generator_loss(fake_output)
 
         if idx > self.args.lazy_path_penalty_after and (idx + 1) % self.args.lazy_path_penalty_interval == 0:
             plp = self.path_length_penalty(w, generated_images)
