@@ -12,6 +12,9 @@ from model import Discriminator, Generator, MappingNetwork, GradientPenalty, Pat
 from utils import cycle_dataloader, log_weights, pretty_json, ImageDataset, Checkpoint
 
 
+manual_seed = True  # for reproducibility
+
+
 class Trainer:
     # Logger
     writer: SummaryWriter
@@ -80,7 +83,7 @@ class Trainer:
         dataset = ImageDataset(self.args.dataset_path, self.args.image_size)
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self.args.batch_size, num_workers=2,
-            shuffle=True, drop_last=True, pin_memory=True
+            shuffle=True and not manual_seed, drop_last=True, pin_memory=True
         )
         self.loader = cycle_dataloader(dataloader)
 
@@ -239,7 +242,13 @@ class Trainer:
 
 
 def main():
-    torch.manual_seed(0)  # for reproducibility
+    if manual_seed:
+        import random
+        import numpy as np
+
+        torch.manual_seed(0)
+        np.random.seed(0)
+        random.seed(0)
 
     parser = argparse.ArgumentParser()
 
