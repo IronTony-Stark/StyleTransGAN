@@ -37,13 +37,14 @@ def manual_seed_all(seed: int = None):
 
     print("[ Using Seed : ", seed, " ]")
 
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.cuda.manual_seed(seed)
-    numpy.random.seed(seed)
     random.seed(seed)
-    torch.backends.cudnn.deterministic = True
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 
 def manual_seed_worker(worker_id: int):

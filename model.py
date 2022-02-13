@@ -33,7 +33,7 @@ class MappingNetwork(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, z: torch.Tensor):
-        z = F.normalize(z, dim=1)
+        z = F.normalize(z, dim=1)  # todo why normalize here?
         return self.net(z)
 
 

@@ -14,7 +14,7 @@ from utils import cycle_dataloader, log_weights, pretty_json, \
     ImageDataset, Checkpoint
 
 
-manual_seed = True  # for reproducibility
+manual_seed_all()  # for reproducibility
 
 
 class Trainer:
@@ -229,9 +229,6 @@ class Trainer:
 
 
 def main():
-    if manual_seed:
-        manual_seed_all()
-
     parser = argparse.ArgumentParser()
 
     # Parameters
