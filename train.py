@@ -7,12 +7,9 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 
-from loss import discriminator_loss, generator_loss, gradient_penalty, PathLengthPenalty
-from model import Discriminator, Generator, MappingNetwork
-from utils import cycle_dataloader, log_weights, pretty_json, requires_grad, ImageDataset, Checkpoint
-
-
-manual_seed = True  # for reproducibility
+from loss import DiscriminatorLoss, GeneratorLoss
+from model import Discriminator, Generator, MappingNetwork, GradientPenalty, PathLengthPenalty
+from utils import cycle_dataloader, log_weights, pretty_json, ImageDataset, Checkpoint
 
 
 class Trainer:
@@ -24,11 +21,15 @@ class Trainer:
     generator: Generator
     mapping_network: MappingNetwork
 
+    # Losses
+    discriminator_loss: DiscriminatorLoss
+    generator_loss: GeneratorLoss
+
     # Penalties
+    gradient_penalty = GradientPenalty()
     gradient_penalty_coefficient: float = 10.
 
     path_length_penalty: PathLengthPenalty
-    path_length_beta: float = 0.99
 
     # Optimizers
     generator_optimizer: torch.optim.Adam
@@ -54,7 +55,9 @@ class Trainer:
         self.generator = Generator(log_resolution, self.args.d_latent).to(self.device)
         self.mapping_network = MappingNetwork(self.args.d_latent, self.args.mapping_network_layers).to(self.device)
 
-        self.path_length_penalty = PathLengthPenalty(self.path_length_beta).to(self.device)
+        self.discriminator_loss = DiscriminatorLoss().to(self.device)
+        self.generator_loss = GeneratorLoss().to(self.device)
+        self.path_length_penalty = PathLengthPenalty(0.99).to(self.device)
 
         self.discriminator_optimizer = torch.optim.Adam(
             self.discriminator.parameters(),
@@ -77,7 +80,7 @@ class Trainer:
         dataset = ImageDataset(self.args.dataset_path, self.args.image_size)
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self.args.batch_size, num_workers=2,
-            shuffle=True and not manual_seed, drop_last=True, pin_memory=True
+            shuffle=True, drop_last=True, pin_memory=True
         )
         self.loader = cycle_dataloader(dataloader)
 
@@ -132,6 +135,10 @@ class Trainer:
     def step(self, idx: int):
         # TODO generator different images for G and D update
         # Train Discriminator
+        # requires_grad(discriminator, True)
+        # requires_grad(generator, False)
+        # requires_grad(mapping_network, False)
+
         self.discriminator_optimizer.zero_grad()
 
         generated_images, _ = self.generate_images(self.args.batch_size)
@@ -145,31 +152,36 @@ class Trainer:
 
         real_output = self.discriminator(real_images)
 
-        real_loss, fake_loss = discriminator_loss(real_output, fake_output)
+        real_loss, fake_loss = self.discriminator_loss(real_output, fake_output)
 
         dis_loss = real_loss + fake_loss
 
         if (idx + 1) % self.args.lazy_gradient_penalty_interval == 0:
-            gp = gradient_penalty(real_images, real_output)
+            gp = self.gradient_penalty(real_images, real_output)
+
+            # TODO move below
+            self.writer.add_scalar("Discriminator/Gradient Penalty", gp.item(), idx)
 
             # todo do you really need to multiply by interval?
             dis_loss = dis_loss + 0.5 * self.gradient_penalty_coefficient * gp * self.args. \
                 lazy_gradient_penalty_interval
-
-            self.writer.add_scalar("Discriminator/Gradient Penalty", gp.item(), idx)
 
         dis_loss.backward()
 
         # For stabilization
         torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=1.0)
 
-        # self.discriminator_optimizer.step()
+        self.discriminator_optimizer.step()
 
         self.writer.add_scalar("Discriminator/Loss", dis_loss.item(), idx)
-        self.writer.add_scalar("Discriminator/Real Score", real_output.mean().item(), idx)
-        self.writer.add_scalar("Discriminator/Fake Score", fake_output.mean().item(), idx)
+        # self.writer.add_scalar("Discriminator/Real Score", real_output.mean().item(), idx)
+        # self.writer.add_scalar("Discriminator/Fake Score", fake_output.mean().item(), idx)
 
         # Train the generator
+        # requires_grad(discriminator, False)
+        # requires_grad(generator, True)
+        # requires_grad(mapping_network, True)
+
         self.generator_optimizer.zero_grad()
         self.mapping_network_optimizer.zero_grad()
 
@@ -177,7 +189,7 @@ class Trainer:
 
         fake_output = self.discriminator(generated_images)
 
-        gen_loss = generator_loss(fake_output)
+        gen_loss = self.generator_loss(fake_output)
 
         if idx > self.args.lazy_path_penalty_after and (idx + 1) % self.args.lazy_path_penalty_interval == 0:
             plp = self.path_length_penalty(w, generated_images)
@@ -195,7 +207,7 @@ class Trainer:
         self.mapping_network_optimizer.step()
 
         self.writer.add_scalar("Generator/Loss", gen_loss.item(), idx)
-        self.writer.add_scalar("Generator/Score", fake_output.mean().item(), idx)
+        # self.writer.add_scalar("Generator/Score", fake_output.mean().item(), idx)
 
         # Logging
         if idx % self.args.log_losses_interval == 0:
@@ -227,13 +239,7 @@ class Trainer:
 
 
 def main():
-    if manual_seed:
-        import random
-        import numpy as np
-
-        torch.manual_seed(0)
-        np.random.seed(0)
-        random.seed(0)
+    torch.manual_seed(0)  # for reproducibility
 
     parser = argparse.ArgumentParser()
 
