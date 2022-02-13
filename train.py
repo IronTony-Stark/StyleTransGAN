@@ -132,10 +132,6 @@ class Trainer:
     def step(self, idx: int):
         # TODO generator different images for G and D update
         # Train Discriminator
-        # requires_grad(discriminator, True)
-        # requires_grad(generator, False)
-        # requires_grad(mapping_network, False)
-
         self.discriminator_optimizer.zero_grad()
 
         generated_images, _ = self.generate_images(self.args.batch_size)
@@ -156,12 +152,11 @@ class Trainer:
         if (idx + 1) % self.args.lazy_gradient_penalty_interval == 0:
             gp = gradient_penalty(real_images, real_output)
 
-            # TODO move below
-            self.writer.add_scalar("Discriminator/Gradient Penalty", gp.item(), idx)
-
             # todo do you really need to multiply by interval?
             dis_loss = dis_loss + 0.5 * self.gradient_penalty_coefficient * gp * self.args. \
                 lazy_gradient_penalty_interval
+
+            self.writer.add_scalar("Discriminator/Gradient Penalty", gp.item(), idx)
 
         dis_loss.backward()
 
@@ -171,14 +166,10 @@ class Trainer:
         self.discriminator_optimizer.step()
 
         self.writer.add_scalar("Discriminator/Loss", dis_loss.item(), idx)
-        # self.writer.add_scalar("Discriminator/Real Score", real_output.mean().item(), idx)
-        # self.writer.add_scalar("Discriminator/Fake Score", fake_output.mean().item(), idx)
+        self.writer.add_scalar("Discriminator/Real Score", real_output.mean().item(), idx)
+        self.writer.add_scalar("Discriminator/Fake Score", fake_output.mean().item(), idx)
 
         # Train the generator
-        # requires_grad(discriminator, False)
-        # requires_grad(generator, True)
-        # requires_grad(mapping_network, True)
-
         self.generator_optimizer.zero_grad()
         self.mapping_network_optimizer.zero_grad()
 
@@ -204,7 +195,7 @@ class Trainer:
         self.mapping_network_optimizer.step()
 
         self.writer.add_scalar("Generator/Loss", gen_loss.item(), idx)
-        # self.writer.add_scalar("Generator/Score", fake_output.mean().item(), idx)
+        self.writer.add_scalar("Generator/Score", fake_output.mean().item(), idx)
 
         # Logging
         if idx % self.args.log_losses_interval == 0:
