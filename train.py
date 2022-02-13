@@ -232,7 +232,6 @@ def main():
         import numpy as np
 
         torch.manual_seed(0)
-        torch.use_deterministic_algorithms(True)
         np.random.seed(0)
         random.seed(0)
 
