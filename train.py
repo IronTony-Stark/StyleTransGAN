@@ -7,8 +7,8 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 
-from loss import DiscriminatorLoss, GeneratorLoss
-from model import Discriminator, Generator, MappingNetwork, GradientPenalty, PathLengthPenalty
+from loss import DiscriminatorLoss, GeneratorLoss, GradientPenalty, PathLengthPenalty
+from model import Discriminator, Generator, MappingNetwork
 from utils import cycle_dataloader, log_weights, pretty_json, ImageDataset, Checkpoint
 
 
