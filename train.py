@@ -14,7 +14,10 @@ from utils import cycle_dataloader, log_weights, pretty_json, \
     ImageDataset, Checkpoint
 
 
-manual_seed_all()  # for reproducibility
+# Reproducibility
+manual_seed_all()
+g = torch.Generator()
+g.manual_seed(0)
 
 
 class Trainer:
@@ -79,7 +82,8 @@ class Trainer:
         dataset = ImageDataset(self.args.dataset_path, self.args.image_size)
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self.args.batch_size, num_workers=2,
-            shuffle=True, drop_last=True, pin_memory=True, worker_init_fn=manual_seed_worker
+            shuffle=True, drop_last=True, pin_memory=True,
+            worker_init_fn=manual_seed_worker, generator=g
         )
         self.loader = cycle_dataloader(dataloader)
 
