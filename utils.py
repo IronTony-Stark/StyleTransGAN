@@ -28,6 +28,33 @@ def pretty_json(json_dict: typing.Dict):
     return "".join("\t" + line for line in json_hp.splitlines(True))
 
 
+def manual_seed_all(seed: int = None):
+    import numpy
+    import random
+
+    if not seed:
+        seed = 0
+
+    print("[ Using Seed : ", seed, " ]")
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed(seed)
+    numpy.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def manual_seed_worker(worker_id: int):
+    import numpy
+    import random
+
+    worker_seed = torch.initial_seed() % 2 ** 32
+    numpy.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
 class ImageDataset(torch.utils.data.Dataset):
     def __init__(self, path: str, image_size: int):
         super().__init__()
