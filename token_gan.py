@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from equalized_lr import EqualizedLinear
 import torch.nn.functional as F
+
+from equalized_lr import EqualizedLinear
 
 
 class MappingNetwork(nn.Module):
@@ -44,13 +45,18 @@ class StyleModulation(nn.Module):
         self.pos = nn.Parameter(torch.zeros(1, (size // patch_size) ** 2, content_dim))
         self.attention = MultiHeadAttention(content_dim, content_dim, content_dim, style_dim)
 
-    def forward(self, x, s, is_new_style=False):
+    def forward(self, x: torch.Tensor, s: torch.Tensor, is_new_style: bool = False):
         """
-        :param x: [batch_size, width * height, content_dim]
+        :param x: [batch_size, content_dim, width, height]
         :param s: [batch_size, style_num, style_dim]
         :param is_new_style: for debugging
         :return: input with style applied
         """
+        # [batch_size, content_dim, width * height]
+        x = x.view(x.size(0), x.size(1), x.size(2) * x.size(3))
+        # [batch_size, width * height, content_dim]
+        x = x.permute(0, 2, 1)
+
         b, t, c = x.size()
 
         # remove old style
@@ -76,6 +82,12 @@ class StyleModulation(nn.Module):
             raise NotImplementedError('Have not implemented this type of style modulation')
 
         out = out.view(b, t, c)
+
+        # [batch_size, content_dim, width * height]
+        out = out.permute(0, 2, 1)
+        # [batch_size, content_dim, width, height]
+        out = out.view(out.size(0), out.size(1), int(out.size(2) ** 0.5), int(out.size(2) ** 0.5))
+
         return out, (new_style.detach(),)
 
 

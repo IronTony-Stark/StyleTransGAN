@@ -1,5 +1,4 @@
 import argparse
-import math
 from typing import Iterator, Tuple
 
 import torch
@@ -57,10 +56,8 @@ class Trainer:
         self.writer = SummaryWriter()
         self.writer.add_text('Config', pretty_json(vars(self.args)))
 
-        log_resolution = int(math.log2(self.args.image_size))
-
-        self.discriminator = Discriminator(log_resolution).to(self.device)
-        self.generator = Generator(log_resolution, self.args.style_dim).to(self.device)
+        self.discriminator = Discriminator(self.args.image_size).to(self.device)
+        self.generator = Generator(self.args.content_dim, self.args.style_num, self.args.style_dim).to(self.device)
         self.mapping_network = MappingNetwork(
             self.args.style_dim,
             self.args.style_num,
@@ -328,6 +325,12 @@ def main():
         type=Tuple[float, float],
         default=(0.0, 0.99),
         help="Betas for Adam optimizer"
+    )
+    parser.add_argument(
+        "--content_dim",
+        type=int,
+        default=512,
+        help="Channel dimension for content (image) vector [batch_size, content_dim, width, height]"
     )
     parser.add_argument(
         "--style_num",
