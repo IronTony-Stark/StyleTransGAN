@@ -27,7 +27,7 @@ class MappingNetwork(nn.Module):
         super().__init__()
 
         layers = []
-        for i in range(n_layers):
+        for _ in range(n_layers):
             layers.append(EqualizedLinear(features, features))
             layers.append(nn.LeakyReLU(negative_slope=0.2, inplace=True))
         self.net = nn.Sequential(*layers)
