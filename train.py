@@ -8,7 +8,8 @@ import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 
 from loss import discriminator_loss, generator_loss, gradient_penalty, PathLengthPenalty
-from model import Discriminator, Generator, MappingNetwork
+from model import Discriminator, Generator
+from token_gan import MappingNetwork
 from utils import cycle_dataloader, log_weights, pretty_json, \
     ImageDataset, Checkpoint
 
@@ -59,8 +60,12 @@ class Trainer:
         log_resolution = int(math.log2(self.args.image_size))
 
         self.discriminator = Discriminator(log_resolution).to(self.device)
-        self.generator = Generator(log_resolution, self.args.d_latent).to(self.device)
-        self.mapping_network = MappingNetwork(self.args.d_latent, self.args.mapping_network_layers).to(self.device)
+        self.generator = Generator(log_resolution, self.args.style_dim).to(self.device)
+        self.mapping_network = MappingNetwork(
+            self.args.style_dim,
+            self.args.style_num,
+            self.args.mapping_network_layers
+        ).to(self.device)
 
         self.path_length_penalty = PathLengthPenalty(self.path_length_beta).to(self.device)
 
@@ -94,19 +99,19 @@ class Trainer:
     def generate_w(self, batch_size: int):
         if torch.rand(()).item() < self.args.style_mixing_prob:
             # Style mixing
-            z1 = torch.randn(batch_size, self.args.d_latent).to(self.device)
-            z2 = torch.randn(batch_size, self.args.d_latent).to(self.device)
+            z1 = torch.randn(batch_size, self.args.style_dim).to(self.device)
+            z2 = torch.randn(batch_size, self.args.style_dim).to(self.device)
             w1 = self.mapping_network(z1)
             w2 = self.mapping_network(z2)
             cross_over_point = int(torch.rand(()).item() * self.generator.n_blocks)
-            w1 = w1[None, :, :].expand(cross_over_point, -1, -1)
-            w2 = w2[None, :, :].expand(self.generator.n_blocks - cross_over_point, -1, -1)
+            w1 = w1[None, :, :, :].expand(cross_over_point, -1, -1, -1)
+            w2 = w2[None, :, :, :].expand(self.generator.n_blocks - cross_over_point, -1, -1, -1)
             return torch.cat((w1, w2), dim=0)
         else:
             # Without style mixing
-            z = torch.randn(batch_size, self.args.d_latent).to(self.device)
+            z = torch.randn(batch_size, self.args.style_dim).to(self.device)
             w = self.mapping_network(z)
-            return w[None, :, :].expand(self.generator.n_blocks, -1, -1)
+            return w[None, :, :, :].expand(self.generator.n_blocks, -1, -1, -1)
 
     # Generate noise for each generator's block
     def generate_noise(self, batch_size: int):
@@ -325,10 +330,16 @@ def main():
         help="Betas for Adam optimizer"
     )
     parser.add_argument(
-        "--d_latent",
+        "--style_num",
+        type=int,
+        default=32,
+        help="Number of styles in style vectors z and w [batch_size, style_num, style_dim]"
+    )
+    parser.add_argument(
+        "--style_dim",
         type=int,
         default=512,
-        help="Dimensionality of z and w"
+        help="Dimensionality of style vectors z and w [batch_size, style_num, style_dim]"
     )
     parser.add_argument(
         "--mapping_network_layers",
