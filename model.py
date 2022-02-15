@@ -33,7 +33,7 @@ class MappingNetwork(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, z: torch.Tensor):
-        z = F.normalize(z, dim=1)  # todo why normalize here?
+        z = F.normalize(z, dim=1)
         return self.net(z)
 
 
@@ -77,7 +77,6 @@ class Generator(nn.Module):
         It's a list of pairs of noise sensors because each block (except the initial) has two noise inputs
         after each convolution layer (see the diagram).
         """
-
         batch_size = w.shape[1]
 
         x = self.initial_constant.expand(batch_size, -1, -1, -1)
@@ -273,9 +272,7 @@ class Discriminator(nn.Module):
         """
         * `x` is the input image of shape `[batch_size, 3, height, width]`
         """
-
-        # todo maybe remove?
-        # Try to normalize the image (this is totally optional, but sped up the early training a little)
+        # Try to normalize the image (this is totally optional, but speeds up the early training a little)
         x = x - 0.5
 
         x = self.from_rgb(x)

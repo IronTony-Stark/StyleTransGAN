@@ -37,7 +37,6 @@ class ImageDataset(torch.utils.data.Dataset):
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((image_size, image_size)),
             torchvision.transforms.ToTensor(),
-            # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             # todo augmentation
         ])
 
