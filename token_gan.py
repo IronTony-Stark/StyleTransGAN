@@ -60,7 +60,7 @@ class StyleModulation(nn.Module):
         b, t, c = x.size()
 
         # remove old style
-        x = norm(x)
+        x = demodulate(x)
         x = x.view(b, t, -1, self.patch_size, self.patch_size)
 
         # calculate new style
@@ -91,6 +91,7 @@ class StyleModulation(nn.Module):
         return out, (new_style.detach(),)
 
 
+# todo wait.. is this really multi head?
 class MultiHeadAttention(nn.Module):
     def __init__(self, embed_dim, qdim, kdim, vdim):
         super(MultiHeadAttention, self).__init__()
@@ -101,7 +102,6 @@ class MultiHeadAttention(nn.Module):
         self.to_v = EqualizedLinear(vdim, embed_dim, bias=False)
 
     def forward(self, q, k, v):
-        b, n, dim = q.size()
         q, k, v = self.to_q(q), self.to_k(k), self.to_v(v)
 
         dots = torch.bmm(q, k.transpose(1, 2)) * self.scale
@@ -110,21 +110,26 @@ class MultiHeadAttention(nn.Module):
         return out, (attn.detach(),)
 
 
-def norm(input, norm_type='layernorm'):
-    # [b, hw, c]
-    if norm_type == 'layernorm' or norm_type == 'l2norm':
-        normdim = -1
-    elif norm_type == 'insnorm':
-        normdim = 1
+def demodulate(x: torch.Tensor, norm_type: str = "LN"):
+    """
+    :param x: [batch_size, width * height, content_dim]
+    :param norm_type: LN - layer norm, L2 - L2 norm, IN - instance norm
+    :return: demodulated (normalized) x
+    """
+    if norm_type == "LN" or norm_type == "L2":
+        norm_dim = -1
+    elif norm_type == "IN":
+        norm_dim = 1
     else:
         raise NotImplementedError('have not implemented this type of normalization')
 
-    if norm_type != 'l2norm':
-        mean = torch.mean(input, dim=normdim, keepdim=True)
-        input = input - mean
+    if norm_type != "L2":
+        mean = torch.mean(x, dim=norm_dim, keepdim=True)
+        x = x - mean
 
-    demod = torch.rsqrt(torch.sum(input ** 2, dim=normdim, keepdim=True) + 1e-8)
-    return input * demod
+    demodulation = torch.rsqrt(torch.sum(x ** 2, dim=norm_dim, keepdim=True) + 1e-8)
+
+    return x * demodulation
 
 
 # Pixelwise feature vector normalization introduced in Progressive GAN https://arxiv.org/abs/1710.10196

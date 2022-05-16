@@ -103,6 +103,7 @@ class Generator(nn.Module):
             x, rgb_new = self.blocks[i - 1](x, w[i], input_noise[i])
             rgb = self.up_sample(rgb) + rgb_new
 
+        # todo tanh at the very end?
         return rgb
 
 
