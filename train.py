@@ -230,10 +230,10 @@ class Trainer:
 
         # Checkpoint
         if (idx + 1) % self.args.save_checkpoint_interval == 0:
-            self.checkpoint.save(f"{idx}.pth", gen_loss.item(), idx)
+            self.checkpoint.save(f"{idx + 1}.pth", gen_loss.item(), idx + 1, save_optimizers_state=True)
 
-    def train(self, num_steps: int):
-        for i in range(num_steps):
+    def train(self, start_step: int, num_steps: int):
+        for i in range(start_step, num_steps):
             self.step(i)
 
 
@@ -246,6 +246,12 @@ def main():
         type=str,
         default="../input/celeba-dataset/img_align_celeba/img_align_celeba/",
         help="Path to the folder with images"
+    )
+    parser.add_argument(
+        "--checkpoint_filename",
+        type=str,
+        default="",
+        help="Filename of the checkpoint"
     )
     parser.add_argument(
         "--image_size",
@@ -367,7 +373,12 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     trainer = Trainer(args, device)
-    trainer.train(args.training_steps)
+
+    step = 0
+    if args.checkpoint_filename:
+        _, step = trainer.checkpoint.load(args.checkpoint_filename, has_optimizers_state=True, device=device)
+
+    trainer.train(step, args.training_steps)
 
 
 if __name__ == '__main__':
